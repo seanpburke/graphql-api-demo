@@ -1,3 +1,8 @@
+*~
+config.json
+graphql-api-demo
+pkg/schema/schema_graphql.go
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

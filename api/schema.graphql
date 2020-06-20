@@ -1,0 +1,67 @@
+type Customer {
+	phone:	    String!
+	storephone: String!
+	contact:    Contact!
+	store:      Store!
+}
+type Contact {
+	firstname: String!
+	lastname:  String!
+	address:   String!
+	city:	   String!
+	state:	   String!
+	zip:	   String!
+}
+
+type Movie {
+	year:  Int!
+	title: String!
+	info:  Info!
+}
+
+type Info {
+	directors: [String!]!
+	rating:	   Float!
+	genres:	   [String!]!
+	plot:	   String!
+	rank:	   Int!
+	actors:	   [String!]!
+}
+
+type Store {
+	phone:	  String!
+	name:	  String!
+	location: Location!
+	customers: [Customer!]!
+        movies(year: Int!, title: String!): [StoreMovie!]!
+}
+
+type Location {
+	address: String!
+	city:	 String!
+	state:	 String!
+	zip:	 String!
+}
+
+type StoreMovie {
+	phone: String!
+	year:  Int!
+	title: String!
+        count: Int!
+}
+
+
+type Query {
+	# Get customer:
+	customer(phone: String!): Customer!
+
+	# Get movie:
+	movie(year: Int!, title: String!): Movie!
+
+	# Get store:
+	store(phone: String!): Store!
+}
+
+schema {
+	query: Query
+}
