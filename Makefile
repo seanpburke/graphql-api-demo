@@ -25,7 +25,7 @@ pkg/schema/schema_graphql.go: api/schema.graphql
 	go generate ./pkg/schema
 
 # Run the unit tests against the local DynamoDB
-test:	generate start
+test:	generate ddb-start
 	env CONFIG=`pwd`/config.json \
 	    AWS_DDB_ENDPOINT=http://localhost:8000 \
 	go test -test.v ./...
@@ -84,17 +84,6 @@ API_URL	= http://$(API_IP):8080/query
 
 test-api: get-customer get-movie get-store get-store-customers get-store-movies get-store-movies-year get-store-movies-title
 
-# Use this target to test the Fargate service.
-# With no load balancer, it takes some digging to get to the task's public IP.
-test-api-fargate:
-	make API_IP=$$(aws ecs list-tasks --cluster default | jq -r '.taskArns[]' \
-	| xargs aws ecs describe-tasks --tasks \
-	| jq    '.tasks[] | select( .group == "service:$(APPNAME)-service" )' \
-	| jq -r '.attachments[] | .details[] | select( .name == "networkInterfaceId" ) | .value' \
-	| xargs -n 1 aws ec2 describe-network-interfaces --network-interface-ids \
-	| jq -r '.NetworkInterfaces[0] | .Association | .PublicIp' \
-	) test-api
-
 get-customer:
 	curl -s -XPOST -d '{"query": "{ customer(phone: \"815-717-3861\") { phone storephone contact { firstname lastname } } }"}' $(API_URL) \
 	| jq -M .
@@ -129,13 +118,13 @@ get-store-movies-title:
 # Local DynamoDB
 # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html
 #
-# 'make start' downloads the movie data and the local DynamoDB to ./data/,
+# 'make ddb-start' downloads the movie data and the local DynamoDB to ./data/,
 # runs the local DynamoDB in the background, creates the table "Rentals",
 # and populates it with data.
 #
 PID=	/tmp/dynamo_db.pid
 
-start:	data $(PID)
+ddb-start: data $(PID)
 
 data:	data/moviedata.json.gz data/DynamoDBLocal.jar
 
@@ -157,7 +146,7 @@ $(PID):	# Run the local DynamoDB under nohup. Use -sharedDb to persist the datab
 	kill -0 `cat $@`
 	env AWS_DDB_ENDPOINT=http://localhost:8000 make create-table
 
-stop:
+ddb-stop:
 	if [ -e $(PID) ] ; then kill `cat $(PID)` ; rm $(PID) ; fi
 	cat /dev/null > nohup.out
 
@@ -217,11 +206,32 @@ scan:	# Scan for SK = "INFO" to get all movies
 	| cat
 
 #=================================================================================
-# Fargate
+# ECS Fargate
+#
+# The ecs-deploy target creates or updates the CloudFormation stack,
+# but the ECS Service initially has a task with DesiredCount equal to zero.
+# The ecs-start target changes the DesiredCount to one. 
+# 
+ecs-deploy:
+	scripts/cf_stack_create | cat
 
-deploy:
-	scripts/ecs_task_register  | cat
-	scripts/ecs_create_service | cat
+ecs-start:
+	scripts/cf_stack_wait stack-create-complete | cat
+	scripts/ecs_service_update 1 | cat
 
-undeploy:
-	scripts/ecs_delete_service | cat
+# Use this target to test the Fargate service.
+# With no load balancer, it takes some digging to get to the task's public IP.
+test-api-fargate:
+	make API_IP=$$(aws ecs list-tasks --cluster default | jq -r '.taskArns[]' \
+	| xargs aws ecs describe-tasks --tasks \
+	| jq    '.tasks[] | select( .group == "service:$(APPNAME)-service" )' \
+	| jq -r '.attachments[] | .details[] | select( .name == "networkInterfaceId" ) | .value' \
+	| xargs -n 1 aws ec2 describe-network-interfaces --network-interface-ids \
+	| jq -r '.NetworkInterfaces[0] | .Association | .PublicIp' \
+	) test-api
+
+ecs-stop:
+	scripts/ecs_service_update 0 | cat
+
+ecs-delete:
+	scripts/cf_stack_delete | cat

@@ -1,9 +1,11 @@
 #!/bin/bash
 
+COUNT=${1:?Please specify the desired count}
+
 CONFIG=$(dirname $0)/../config.json
 APPNAME=$( jq -r < $CONFIG '.appname')
 REGION=$(  jq -r < $CONFIG '.region')
 
-aws ecs delete-service --force --service "${APPNAME}-service"
+aws ecs update-service --service "${APPNAME}-service" --desired-count $COUNT
 
 

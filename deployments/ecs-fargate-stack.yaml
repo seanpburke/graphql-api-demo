@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to create a new ECS Fargate GraphQL Demo stack
+Parameters:
+  EcrRegistry:
+    Type: String
+    Description: ECR Registry Name
+  EcsClusterName:
+    Type: String
+    Description: ECS Cluster Name
+    Default: default
+  EcsServiceName:
+    Type: String
+    Description: ECS Service Name
+    Default: graphql-api-demo-service
+  EcsPort:
+    Type: String
+    Description: Optional - Security Group port to open on ECS instances - defaults to port 80
+    Default: '80'
+  EcsTaskName:
+    Type: String
+    Description: ECS Task Family Name
+    Default: graphql-api-demo-task
+  EcsInstanceType:
+    Type: String
+    Description: ECS EC2 instance type
+    Default: t2.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+  SourceCidr:
+    Type: String
+    Description: Optional - CIDR/IP range for EcsPort and ElbPort - defaults to 0.0.0.0/0
+    Default: 0.0.0.0/0
+  VpcAvailabilityZones:
+    Type: CommaDelimitedList
+    Description: 'Optional - Comma-delimited list of two VPC availability zones in which to create subnets'
+    Default: ''
+  VpcCidrBlock:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.0.0/16
+  SubnetCidrBlock1:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.0.0/24
+  SubnetCidrBlock2:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.1.0/24
+Conditions:
+  UseSpecifiedVpcAvailabilityZones: !Not [!Equals [!Join ['', !Ref 'VpcAvailabilityZones'],'']]
+Resources:
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Ref 'EcsServiceName'
+      Cluster: !Ref 'EcsClusterName'
+      DesiredCount: 0
+      LaunchType: 'FARGATE'
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: 'ENABLED'
+          SecurityGroups: [ !Ref 'EcsSecurityGroup' ]
+          Subnets: [ !Ref 'PublicSubnetAz1', !Ref 'PublicSubnetAz2' ]
+      SchedulingStrategy: 'REPLICA'
+      TaskDefinition: !Ref 'EcsTaskDefinition'
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref 'EcsTaskName'
+      Cpu: '256'
+      Memory: '512'
+      TaskRoleArn: 'ECS-Task-DynamoDB'
+      ExecutionRoleArn: 'ecsTaskExecutionRole'
+      NetworkMode: 'awsvpc'
+      RequiresCompatibilities: [ 'FARGATE' ]
+      ContainerDefinitions:
+        -
+          Name: !Ref 'EcsTaskName'
+          Image: !Join [ '/', [ !Ref 'EcrRegistry', 'graphql-api-demo:latest' ]]
+          Cpu: '256'
+          Memory: '512'
+          PortMappings:
+            -
+              Protocol: 'tcp'
+              HostPort: '8080'
+              ContainerPort: '8080'
+          LogConfiguration:
+            LogDriver: 'awslogs'
+            Options:
+              awslogs-group: '/ecs/graphql-api-demo'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: 'ecs'
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref 'VpcCidrBlock'
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'VPC']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  PublicSubnetAz1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'Vpc'
+      CidrBlock: !Ref 'SubnetCidrBlock1'
+      AvailabilityZone: !If
+       - UseSpecifiedVpcAvailabilityZones
+       - !Select ['0', !Ref 'VpcAvailabilityZones']
+       - !Select
+         - '0'
+         - Fn::GetAZs:
+             !Ref AWS::Region
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'Public Subnet 1']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  PublicSubnetAz2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref 'Vpc'
+      CidrBlock: !Ref 'SubnetCidrBlock2'
+      AvailabilityZone: !If
+       - UseSpecifiedVpcAvailabilityZones
+       - !Select ['1', !Ref 'VpcAvailabilityZones']
+       - !Select
+         - '1'
+         - Fn::GetAZs:
+             !Ref AWS::Region
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'Public Subnet 2']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'InternetGateway']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'Vpc'
+      InternetGatewayId: !Ref 'InternetGateway'
+  RouteViaIgw:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'Vpc'
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'RouteTable']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  PublicRouteViaIgw:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref 'RouteViaIgw'
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref 'PublicSubnetAz1'
+      RouteTableId: !Ref 'RouteViaIgw'
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref 'PublicSubnetAz2'
+      RouteTableId: !Ref 'RouteViaIgw'
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !Ref 'Vpc'
+      SecurityGroupIngress:
+        -
+          IpProtocol: 'tcp'
+          FromPort: !Ref 'EcsPort'
+          ToPort: !Ref 'EcsPort'
+          CidrIp: !Ref 'SourceCidr'
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'ECS SecurityGroup']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+Outputs:
+  Version:
+    Description: ECS Cloudformation template version
+    Value: 3.0.0

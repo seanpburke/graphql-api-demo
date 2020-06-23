@@ -1,0 +1,24 @@
+#!/bin/bash
+
+PROJECT=$(dirname $0)/..
+CONFIG=$PROJECT/config.json
+DEPLOY=$PROJECT/deployments/ecs-fargate-stack.yaml
+
+REGION=$(jq -r < $CONFIG '.region')
+REGISTRY=$(jq -r < $CONFIG '.registry')
+STACKNAME=$(jq -r < $CONFIG '.appname' | tr _ - )-stack
+
+# Update or create the stack, as necessary.
+if aws cloudformation describe-stacks --stack-name "$STACKNAME" >/dev/null
+then echo Updating $STACKNAME
+     VERB=update-stack
+else echo Creating $STACKNAME
+     VERB=create-stack
+fi
+
+aws cloudformation  ${VERB} \
+    --stack-name    ${STACKNAME} \
+    --region        ${REGION} \
+    --template-body file://${DEPLOY} \
+    --parameters "ParameterKey=EcrRegistry,ParameterValue=$REGISTRY" \
+                 "ParameterKey=EcsPort,ParameterValue=8080"

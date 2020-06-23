@@ -1,0 +1,24 @@
+#!/bin/bash
+
+CONDITION=${1:?Please specify the wait condition}
+#
+# The valid conditions are:
+#   change-set-create-complete
+#   stack-create-complete
+#   stack-delete-complete
+#   stack-exists
+#   stack-import-complete
+#   stack-update-complete
+#   type-registration-complete
+
+PROJECT=$(dirname $0)/..
+CONFIG=$PROJECT/config.json
+DEPLOY=$PROJECT/deployments/ecs-fargate-stack.yaml
+
+REGION=$(jq -r < $CONFIG '.region')
+REGISTRY=$(jq -r < $CONFIG '.registry')
+STACKNAME=$(jq -r < $CONFIG '.appname' | tr _ - )-stack
+
+aws cloudformation  wait ${CONDITION} \
+    --stack-name    ${STACKNAME} \
+    --region        ${REGION}

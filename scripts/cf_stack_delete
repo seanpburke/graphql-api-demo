@@ -1,0 +1,8 @@
+#!/bin/bash
+
+PROJECT=$(dirname $0)/..
+CONFIG=$PROJECT/config.json
+APPNAME=$( jq -r < $CONFIG '.appname')
+REGION=$(  jq -r < $CONFIG '.region')
+
+aws cloudformation delete-stack --stack-name ${APPNAME}-stack --region ${REGION}
