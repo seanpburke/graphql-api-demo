@@ -74,6 +74,9 @@ Before creating the prerequesites, ensure that you install the following tools:
 - Install golang
 - Install jq
 - On MacOS, install XCode comand line tools
+- Install Docker
+
+This is a quick guide to setting up Docker for use with ECS: [Docker basics for Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/docker-basics.html)
 
 ### AWS Prerequisites
 
@@ -131,6 +134,8 @@ You must create and attach this policy to the role:
     ]
 }
 ```
+For more information on defining IAM roles for ECS tasks, see: [IAM Roles for Tasks](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html)
+
 #### AWS DynamoDB Table
 
 To create and populate the DynamoDB table, do:
