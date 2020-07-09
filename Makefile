@@ -214,20 +214,20 @@ scan:	# Scan for SK = "INFO" to get all movies
 # 
 ecs-deploy:
 	scripts/cf_stack_create | cat
+	@ echo Waiting for stack creation to complete...
+	scripts/cf_stack_wait stack-create-complete | cat
 
 ecs-start:
-	scripts/cf_stack_wait stack-create-complete | cat
 	scripts/ecs_service_update 1 | cat
 
 # Use this target to test the Fargate service.
-# With no load balancer, it takes some digging to get to the task's public IP.
+# We extract the load balancer ARN from the stack outputs,
+# and use that to obtain the ELB's DNS name.
 test-api-fargate:
-	make API_IP=$$(aws ecs list-tasks --cluster default | jq -r '.taskArns[]' \
-	| xargs aws ecs describe-tasks --tasks \
-	| jq    '.tasks[] | select( .group == "service:$(APPNAME)-service" )' \
-	| jq -r '.attachments[] | .details[] | select( .name == "networkInterfaceId" ) | .value' \
-	| xargs -n 1 aws ec2 describe-network-interfaces --network-interface-ids \
-	| jq -r '.NetworkInterfaces[0] | .Association | .PublicIp' \
+	make API_IP=$$(aws cloudformation describe-stacks --stack-name "graphql-api-demo-stack" \
+	| jq -M -r '.Stacks[0].Outputs[] | select(.OutputKey == "EcsElbName") | .OutputValue' \
+	| xargs aws elbv2 describe-load-balancers --load-balancer-arns \
+	| jq -M -r '.LoadBalancers[0].DNSName' \
 	) test-api
 
 ecs-stop:
@@ -235,3 +235,5 @@ ecs-stop:
 
 ecs-delete:
 	scripts/cf_stack_delete | cat
+	@ echo Waiting for stack deletion to complete...
+	scripts/cf_stack_wait stack-delete-complete | cat

@@ -9,7 +9,7 @@ REGISTRY=$(jq -r < $CONFIG '.registry')
 STACKNAME=$(jq -r < $CONFIG '.appname' | tr _ - )-stack
 
 # Update or create the stack, as necessary.
-if aws cloudformation describe-stacks --stack-name "$STACKNAME" >/dev/null
+if aws cloudformation describe-stacks --stack-name "$STACKNAME" >/dev/null 2>&1
 then echo Updating $STACKNAME
      VERB=update-stack
 else echo Creating $STACKNAME
@@ -20,5 +20,4 @@ aws cloudformation  ${VERB} \
     --stack-name    ${STACKNAME} \
     --region        ${REGION} \
     --template-body file://${DEPLOY} \
-    --parameters "ParameterKey=EcrRegistry,ParameterValue=$REGISTRY" \
-                 "ParameterKey=EcsPort,ParameterValue=8080"
+    --parameters "ParameterKey=EcrRegistry,ParameterValue=$REGISTRY"

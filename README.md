@@ -187,7 +187,7 @@ When you wish to delete the ECS Task:
 
     make ecs-stop
 
-To delete the entire CloudWatch stack:
+To delete the entire CloudFormation stack:
 
     make ecs-delete
 

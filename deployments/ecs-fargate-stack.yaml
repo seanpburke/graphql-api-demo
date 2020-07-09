@@ -14,8 +14,8 @@ Parameters:
     Default: graphql-api-demo-service
   EcsPort:
     Type: String
-    Description: Optional - Security Group port to open on ECS instances - defaults to port 80
-    Default: '80'
+    Description: Optional - Security Group port to open on ECS instances - defaults to port 8080
+    Default: '8080'
   EcsTaskName:
     Type: String
     Description: ECS Task Family Name
@@ -25,10 +25,22 @@ Parameters:
     Description: ECS EC2 instance type
     Default: t2.micro
     ConstraintDescription: must be a valid EC2 instance type.
+  CreateElasticLoadBalancer:
+    Type: String
+    Description: Optional - When set to true, creates a ELB for ECS Service
+    Default: 'true'
+  ElbPort:
+    Type: String
+    Description: Optional - Security Group port to open on ELB - port 8080 will be open by default
+    Default: '8080'
   SourceCidr:
     Type: String
     Description: Optional - CIDR/IP range for EcsPort and ElbPort - defaults to 0.0.0.0/0
     Default: 0.0.0.0/0
+  TargetType:
+    Type: String
+    Description: Optional - the ALB target group target type, defaults to ip
+    Default: 'ip'
   VpcAvailabilityZones:
     Type: CommaDelimitedList
     Description: 'Optional - Comma-delimited list of two VPC availability zones in which to create subnets'
@@ -45,16 +57,25 @@ Parameters:
     Type: String
     Description: Optional - CIDR/IP range for the VPC
     Default: 10.0.1.0/24
+
 Conditions:
+  CreateELB: !Equals [!Ref 'CreateElasticLoadBalancer', 'true']
   UseSpecifiedVpcAvailabilityZones: !Not [!Equals [!Join ['', !Ref 'VpcAvailabilityZones'],'']]
+
 Resources:
   EcsService:
     Type: AWS::ECS::Service
+    DependsOn: 'LoadBalancerListener'
     Properties:
       ServiceName: !Ref 'EcsServiceName'
       Cluster: !Ref 'EcsClusterName'
       DesiredCount: 0
       LaunchType: 'FARGATE'
+      LoadBalancers:
+        -
+          TargetGroupArn: !Ref 'DefaultTargetGroup'
+          ContainerName: !Ref 'EcsTaskName'
+          ContainerPort: !Ref 'EcsPort'
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: 'ENABLED'
@@ -81,8 +102,8 @@ Resources:
           PortMappings:
             -
               Protocol: 'tcp'
-              HostPort: '8080'
-              ContainerPort: '8080'
+              HostPort: !Ref 'EcsPort'
+              ContainerPort: !Ref 'EcsPort'
           LogConfiguration:
             LogDriver: 'awslogs'
             Options:
@@ -188,12 +209,25 @@ Resources:
     Properties:
       GroupDescription: ECS Allowed Ports
       VpcId: !Ref 'Vpc'
-      SecurityGroupIngress:
+      SecurityGroupIngress: !If
+        - CreateELB
         -
-          IpProtocol: 'tcp'
-          FromPort: !Ref 'EcsPort'
-          ToPort: !Ref 'EcsPort'
-          CidrIp: !Ref 'SourceCidr'
+          - 
+            IpProtocol: 'tcp'
+            FromPort: !Ref 'EcsPort'
+            ToPort: !Ref 'EcsPort'
+            CidrIp: !Ref 'SourceCidr'
+          -
+            IpProtocol: 'tcp'
+            FromPort: '1'
+            ToPort: '65535'
+            SourceSecurityGroupId: !Ref 'AlbSecurityGroup'
+        -
+          -
+            IpProtocol: 'tcp'
+            FromPort: !Ref 'EcsPort'
+            ToPort: !Ref 'EcsPort'
+            CidrIp: !Ref 'SourceCidr'
       Tags:
         -
           Key: 'Name'
@@ -201,7 +235,71 @@ Resources:
         -
           Key: 'Description'
           Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  AlbSecurityGroup:
+    Condition: CreateELB
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ELB Allowed Ports
+      VpcId: !Ref 'Vpc'
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: !Ref 'ElbPort'
+          ToPort: !Ref 'ElbPort'
+          CidrIp: !Ref 'SourceCidr'
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'ALB SecurityGroup']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  DefaultTargetGroup:
+    Condition: CreateELB
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref 'Vpc'
+      Port: !Ref 'ElbPort'
+      TargetType: !Ref 'TargetType'
+      Protocol: HTTP
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'TargetGroup']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  EcsElasticLoadBalancer:
+    Condition: CreateELB
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      SecurityGroups:
+        - !Ref 'AlbSecurityGroup'
+      Subnets:
+        - !Ref 'PublicSubnetAz1'
+        - !Ref 'PublicSubnetAz2'
+      Scheme: internet-facing
+      Tags:
+        -
+          Key: 'Name'
+          Value: !Join [' ', ['ECS', !Ref 'EcsClusterName', '-', 'ALB']]
+        -
+          Key: 'Description'
+          Value: !Join [' ', ['Created for ECS cluster', !Ref 'EcsClusterName']]
+  LoadBalancerListener:
+    Condition: CreateELB
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref 'EcsElasticLoadBalancer'
+      Port: !Ref 'ElbPort'
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref 'DefaultTargetGroup'
+
 Outputs:
+  EcsElbName:
+    Description: Load Balancer for ECS Service
+    Value: !If [CreateELB, !Ref 'EcsElasticLoadBalancer', '']
   Version:
     Description: ECS Cloudformation template version
     Value: 3.0.0
