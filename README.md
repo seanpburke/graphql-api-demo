@@ -55,11 +55,12 @@ The Makefile also demonstrates some of the queries that you can make via the Gra
 
 ### Using a local DynamoDB
 
-The DynamoDB portions of this app are set up to run with a local DynamoDB service.
-To learn more about Amazon's "local" DynamoDB, refer to these links:
+The DynamoDB portions of this app are able optionally to run with a local DynamoDB service,
+by setting the environment variable `AWS_DDB_ENDPOINT=http://localhost:8000`.
+To learn more about Amazon's "local" DynamoDB, refer to:
 
-https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html
-https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.UsageNotes.html
+[Deploying DynamoDB Locally on Your Computer](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html)  
+[Local DynamoDB Usage Notes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.UsageNotes.html)
 
 
 ## Running the Demo
@@ -144,12 +145,8 @@ To create and populate the DynamoDB table, do:
 
 #### AWS ECR Repository
 
-In the Elastic Container Registry, create a new repository named `graphql-api-demo`,
-copy the repository URI, and edit the Makefile to set the correnct REGION and REGISTRY:
-
-    REGION=   us-west-1
-    REGISTRY= 12345678900.dkr.ecr.us-west-1.amazonaws.com
-
+In the Elastic Container Registry (ECR) console, create a new repository named
+`graphql-api-demo`, in the same AWS region that you gave to `aws configure`.
 Now, build the docker image and push it to your ECR Repository:
 
     make docker-push

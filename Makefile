@@ -1,10 +1,11 @@
 
 # These settings are written to config.json.
-# You will need to change REGION and REGISTRY.
+# You will need to have run 'aws configure'.
 #
+ACCOUNT = $(shell aws sts get-caller-identity --query Account --output text)
 APPNAME	= $(shell basename `pwd`)
-REGION	= us-west-2
-REGISTRY= 519021347300.dkr.ecr.us-west-2.amazonaws.com
+REGION	= $(shell aws configure get region)
+REGISTRY= $(ACCOUNT).dkr.ecr.$(REGION).amazonaws.com
 TABLE	= Rentals
 
 default: run
