@@ -207,7 +207,7 @@ scan:	# Scan for SK = "INFO" to get all movies
 	| cat
 
 #=================================================================================
-# ECS Fargate
+# ECS Fargate deploy via CloudFormation
 #
 # The ecs-deploy target creates or updates the CloudFormation stack,
 # but the ECS Service initially has a task with DesiredCount equal to zero.
@@ -238,3 +238,26 @@ ecs-delete:
 	scripts/cf_stack_delete | cat
 	@ echo Waiting for stack deletion to complete...
 	scripts/cf_stack_wait stack-delete-complete | cat
+
+#=================================================================================
+# ECS Fargate deploy via Terraform
+#
+tf-init: ./deployments/.terraform
+
+./deployments/.terraform:
+	cd deployments ; terraform init
+
+tf-plan: ./deployments/terraform.plan
+
+./deployments/terraform.plan: ./deployments/*.tf
+	cd deployments ; terraform plan -no-color -out terraform.plan
+
+tf-deploy: tf-init tf-plan
+	cd deployments ; terraform apply -no-color -auto-approve terraform.plan
+
+# Use this target to test the Fargate service.
+tf-test-api-fargate:
+	make API_IP=$$(cd deployments ; terraform output -json elb | jq -r .dns_name) test-api
+
+tf-destroy:
+	cd deployments ; terraform destroy -auto-approve
