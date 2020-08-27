@@ -7,7 +7,7 @@ provider "aws" {
 locals {
   ecr_registry = (var.ecr_registry != "") ? var.ecr_registry : format("%s.dkr.ecr.%s.amazonaws.com", data.aws_caller_identity.current.account_id, data.aws_region.current.id)
 
-  // Define as a local that we can encode to JSON in the task definition.
+  // Define as a local, so that we can encode to JSON in the task definition.
   container_definition = {
     name   = var.ecs_task_name
     image  = "${local.ecr_registry}/${var.ecr_image}:latest"
@@ -77,8 +77,8 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_subnet" "sn" {
-  vpc_id            = aws_vpc.main.id
   count             = length(var.subnet_cidr_blocks)
+  vpc_id            = aws_vpc.main.id
   availability_zone = data.aws_availability_zones.available.names[(count.index + 2) % length(data.aws_availability_zones.available.names)]
   cidr_block        = var.subnet_cidr_blocks[count.index]
 
@@ -99,7 +99,7 @@ resource "aws_route_table" "rt" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "ECS-Defalut-RouteTable"
+    Name = "ECS-Default-RouteTable"
   }
 }
 
@@ -133,6 +133,19 @@ resource "aws_security_group" "sg" {
     security_groups = [aws_security_group.elb.id]
   }
 
+  /* By default, AWS creates an ALLOW ALL egress rule when creating a new Security Group inside of
+     a VPC. When creating a new Security Group inside a VPC, Terraform will remove this default rule,
+     and require you specifically re-create it if you desire that rule. We feel this leads to fewer
+     surprises in terms of controlling your egress rules. If you desire this rule to be in place,
+     you can use this egress block:
+  */
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = "ECS-Default-ECS-SecurityGroup"
   }
@@ -147,6 +160,13 @@ resource "aws_security_group" "elb" {
     from_port   = var.elb_port
     to_port     = var.elb_port
     cidr_blocks = [var.source_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
