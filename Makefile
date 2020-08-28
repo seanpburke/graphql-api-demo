@@ -257,7 +257,7 @@ tf-deploy: tf-init tf-plan
 
 # Use this target to test the Fargate service.
 tf-test-api-fargate:
-	make API_IP=$$(cd deployments ; terraform output -json elb | jq -r .dns_name) test-api
+	make API_IP=$$(terraform output -state deployments/terraform.tfstate -json elb | jq -r .dns_name) test-api
 
 tf-destroy:
 	cd deployments ; terraform destroy -auto-approve

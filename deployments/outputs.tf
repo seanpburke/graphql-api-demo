@@ -6,14 +6,11 @@ output "region_name" {
   value = data.aws_region.current.name
 }
 
+output "container_definitiond" {
+  value = local.container_definition
+}
+
 output "elb" {
   value = aws_lb.elb
 }
 
-output "tg" {
-  value = aws_lb_target_group.tg
-}
-
-output "cd" {
-  value = jsonencode(local.container_definition)
-}

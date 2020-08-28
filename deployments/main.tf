@@ -7,6 +7,8 @@ provider "aws" {
 locals {
   ecr_registry = (var.ecr_registry != "") ? var.ecr_registry : format("%s.dkr.ecr.%s.amazonaws.com", data.aws_caller_identity.current.account_id, data.aws_region.current.id)
 
+  log_group_name = "/ecs/graphql-api-demo"
+
   // Define as a local, so that we can encode to JSON in the task definition.
   container_definition = {
     name   = var.ecs_task_name
@@ -23,7 +25,7 @@ locals {
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        awslogs-group         = "/ecs/graphql-api-demo"
+        awslogs-group         = local.log_group_name
         awslogs-region        = data.aws_region.current.id
         awslogs-stream-prefix = "ecs"
       }
@@ -63,6 +65,12 @@ resource "aws_ecs_task_definition" "task" {
   task_role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ECS-Task-DynamoDB"
   execution_role_arn       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ecsTaskExecutionRole"
   container_definitions    = jsonencode([local.container_definition])
+  depends_on               = [aws_cloudwatch_log_group.lg]
+}
+
+resource "aws_cloudwatch_log_group" "lg" {
+  name              = local.log_group_name
+  retention_in_days = 1
 }
 
 resource "aws_vpc" "main" {
