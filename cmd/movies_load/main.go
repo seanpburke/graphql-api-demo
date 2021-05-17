@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/schema"
+	"github.com/seanpburke/graphql-api-demo/pkg/schema"
 )
 
 // readMovies reads Movies from a gzipped JSON via stdin.

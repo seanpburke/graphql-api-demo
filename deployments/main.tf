@@ -25,6 +25,7 @@ locals {
     logConfiguration = {
       logDriver = "awslogs"
       options = {
+        awslogs-create-group  = "true"
         awslogs-group         = local.log_group_name
         awslogs-region        = data.aws_region.current.id
         awslogs-stream-prefix = "ecs"

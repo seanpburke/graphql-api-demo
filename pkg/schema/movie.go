@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/config"
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/table"
+	"github.com/seanpburke/graphql-api-demo/pkg/config"
+	"github.com/seanpburke/graphql-api-demo/pkg/table"
 )
 
 type Info struct {

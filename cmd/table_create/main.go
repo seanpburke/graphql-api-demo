@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/config"
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/table"
+	"github.com/seanpburke/graphql-api-demo/pkg/config"
+	"github.com/seanpburke/graphql-api-demo/pkg/table"
 )
 
 func main() {

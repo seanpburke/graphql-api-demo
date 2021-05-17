@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/graph-gophers/graphql-go/relay"
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/schema"
+	"github.com/seanpburke/graphql-api-demo/pkg/schema"
 )
 
 func main() {

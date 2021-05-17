@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/table"
+	"github.com/seanpburke/graphql-api-demo/pkg/table"
 )
 
 type Contact struct {

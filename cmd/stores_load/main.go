@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/schema"
+	"github.com/seanpburke/graphql-api-demo/pkg/schema"
 )
 
 var stores = []schema.Store{

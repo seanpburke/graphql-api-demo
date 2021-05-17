@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
-	"github.com/sburke-at-ziprecruiter/graphql-api-demo/pkg/config"
+	"github.com/seanpburke/graphql-api-demo/pkg/config"
 )
 
 // Item is an interface for items that go in the table.
