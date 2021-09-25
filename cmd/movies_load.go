@@ -1,14 +1,25 @@
-package main
+package cmd
 
 import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/seanpburke/graphql-api-demo/pkg/schema"
+	"github.com/spf13/cobra"
 )
+
+func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "movies-load",
+		Short: "Load movies into DynamoDB",
+		Args:  cobra.NoArgs,
+		Run:   MoviesLoad,
+	})
+}
 
 // readMovies reads Movies from a gzipped JSON via stdin.
 // Note that these movies need to call Init() to set PK and SK.
@@ -32,31 +43,30 @@ func readMovies() ([]schema.Movie, error) {
 	return movies, nil
 }
 
-func main() {
+func MoviesLoad(cmd *cobra.Command, args []string) {
 
 	// Load Movies via stdin and add them the DDB table.
 	movies, err := readMovies()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 	for ix, movie := range movies {
 		if ix > 9 {
 			break
 		}
 		if err = movie.Put(); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
 	}
 
 	// Scan the movies that we loaded.
 	movies, err = schema.ScanMovies()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
-	for _, movie := range movies {
-		fmt.Printf("Successfully added %q (%d) to table.\n", movie.Title, movie.Year)
+	if Verbose {
+		for _, movie := range movies {
+			fmt.Printf("Successfully added %q (%d) to table.\n", movie.Title, movie.Year)
+		}
 	}
 }

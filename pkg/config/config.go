@@ -1,22 +1,20 @@
 package config
 
 import (
-	"archive/zip"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const (
-	defaultConfigPath = "config.json"
-	envConfigPath     = "CONFIG"
-	envDDBEndpoint    = "AWS_DDB_ENDPOINT"
+	defaultConfigPath    = "."
+	defaultListenAddress = ":8080"
+	envConfigDirectory   = "CONFIG_DIR"
+	envDDBEndpoint       = "AWS_DDB_ENDPOINT"
 )
 
 var configPath = defaultConfigPath
@@ -26,31 +24,29 @@ var Config struct {
 	AppName  string // This app's name
 	Region   string // AWS Region
 	Registry string // AWS ECR registry
-	Table    string // aWS DynamoDB Table Name
+	Table    string // AWS DynamoDB Table Name
+	Listen   string // HTTP Listener Address
 
 	AWS *session.Session
 	DDB *dynamodb.DynamoDB
 }
 
 func init() {
-	err := Init()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
 
-func Init() error {
-	if v := os.Getenv(envConfigPath); v != "" {
-		configPath = v
+	viper.AutomaticEnv()
+	viper.SetConfigName("config")
+	viper.SetDefault("Listen", defaultListenAddress)
+
+	if v := os.Getenv(envConfigDirectory); v != "" {
+		viper.AddConfigPath(v)
+	} else {
+		viper.AddConfigPath(".")
 	}
-	raw, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("Reading %s - %w", configPath, err)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("%s", err)
 	}
-	err = json.Unmarshal(raw, &Config)
-	if err != nil {
-		return fmt.Errorf("Unmarshalling %s - %w", configPath, err)
+	if err := viper.Unmarshal(&Config); err != nil {
+		log.Fatalf("%s", err)
 	}
 
 	// Initialize the AWS session. In order to load credentials
@@ -70,29 +66,4 @@ func Init() error {
 		cnf = cnf.WithEndpoint(endpoint)
 	}
 	Config.DDB = dynamodb.New(Config.AWS, cnf)
-
-	return nil
-}
-
-// ArchiveHook adds config.json to the Lambda zip archive.
-func ArchiveHook(context map[string]interface{},
-	serviceName string,
-	zipWriter *zip.Writer,
-	awsSession *session.Session,
-	noop bool,
-	logger *logrus.Logger) error {
-
-	data, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("Reading %s - %w", configPath, err)
-	}
-	iow, err := zipWriter.Create(defaultConfigPath)
-	if err != nil {
-		return fmt.Errorf("Creating %s - %w", defaultConfigPath, err)
-	}
-	_, err = iow.Write(data)
-	if err != nil {
-		return fmt.Errorf("Writing %s - %w", defaultConfigPath, err)
-	}
-	return nil
 }

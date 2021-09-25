@@ -1,48 +1,55 @@
-package main
+package cmd
 
 import (
 	"fmt"
-	"os"
+	"log"
 
 	"github.com/seanpburke/graphql-api-demo/pkg/schema"
+	"github.com/spf13/cobra"
 )
 
-func main() {
+func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "movie-rent",
+		Short: "Record a movie rental in DynamoDB",
+		Args:  cobra.NoArgs,
+		Run:   MovieRent,
+	})
+}
+
+func MovieRent(cmd *cobra.Command, args []string) {
 
 	// Get my customer
 	customerPhone := "828-234-1717"
 	cus, err := schema.GetCustomer(customerPhone)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 	fmt.Println("Customer:", cus)
 
 	sto, err := cus.Store()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 	fmt.Println("Store:", sto)
 
 	rental, err := cus.PutRental()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 	fmt.Println("Rental:", rental)
 
 	mov, err := schema.GetMovie(2013, "Rush")
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 	fmt.Println("Movie:", mov)
 
 	movren, err := mov.PutRental(rental.Phone, rental.Date)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
-	fmt.Printf("Successfully added rental %s (%d) to %s on %s\n", movren.Title, movren.Year, movren.Phone, movren.Date)
+	if Verbose {
+		fmt.Printf("Successfully added rental %s (%d) to %s on %s\n", movren.Title, movren.Year, movren.Phone, movren.Date)
+	}
 }

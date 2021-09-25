@@ -1,10 +1,10 @@
-package main
+package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/seanpburke/graphql-api-demo/pkg/schema"
+	"github.com/spf13/cobra"
 )
 
 var customers = []schema.Customer{
@@ -46,31 +46,38 @@ var customers = []schema.Customer{
 	},
 }
 
-func main() {
+func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "customers-load",
+		Short: "Load customers into DynamoDB",
+		Args:  cobra.NoArgs,
+		Run:   CustomersLoad,
+	})
+}
+
+func CustomersLoad(cmd *cobra.Command, args []string) {
 
 	// Load customers into the DynamoDB table.
 	for _, cus := range customers {
 		if err := cus.Put(); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
 		// Load the customer's store
 		sto, err := cus.Store()
 		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
 		// Get the store's customers
 		customers, err := sto.Customers()
 		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
-		if len(customers) != 1 {
-			fmt.Println("Expecting one customer for store", sto.Name)
-			os.Exit(1)
+		if len(customers) == 0 {
+			log.Fatal("Expecting at least one customer for store", sto.Name)
 		}
 		c := customers[0]
-		fmt.Printf("Successfully added %s %s (%s) to %s\n", c.Contact.FirstName, c.Contact.LastName, c.Phone, sto.Name)
+		if Verbose {
+			log.Printf("Successfully added %s %s (%s) to %s\n", c.Contact.FirstName, c.Contact.LastName, c.Phone, sto.Name)
+		}
 	}
 }

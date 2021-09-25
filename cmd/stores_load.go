@@ -1,10 +1,10 @@
-package main
+package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/seanpburke/graphql-api-demo/pkg/schema"
+	"github.com/spf13/cobra"
 )
 
 var stores = []schema.Store{
@@ -40,40 +40,49 @@ var stores = []schema.Store{
 	},
 }
 
-func main() {
+func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "stores-load",
+		Short: "Load stores into DynamoDB",
+		Args:  cobra.NoArgs,
+		Run:   StoresLoad,
+	})
+}
+
+func StoresLoad(cmd *cobra.Command, args []string) {
 
 	// Scan all of the movies
 	movies, err := schema.ScanMovies()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 
 	// Load stores into DynamoDB
 	for _, sto := range stores {
 
 		if err := sto.Put(); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
-		fmt.Printf("Successfully added %q (%s)\n", sto.Name, sto.PK)
+		if Verbose {
+			log.Printf("Successfully added %q (%s)\n", sto.Name, sto.PK)
+		}
 
 		// Put 3 copies of each movie in this store's inventory.
 		for _, mov := range movies {
 			if err := sto.PutMovie(mov.Year, mov.Title, 3); err != nil {
-				fmt.Println(err.Error())
-				os.Exit(1)
+				log.Fatal(err.Error())
 			}
 		}
 
 		// Fetch this store's entire inventory.
 		inventory, err := sto.GetMovies(0, "")
 		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
-		for _, inv := range inventory {
-			fmt.Printf("Successfully added %q(%d)[%d] to inventory of %q\n", inv.Title, inv.Year, inv.Count, sto.Name)
+		if Verbose {
+			for _, inv := range inventory {
+				log.Printf("Successfully added %q(%d)[%d] to inventory of %q\n", inv.Title, inv.Year, inv.Count, sto.Name)
+			}
 		}
 	}
 }

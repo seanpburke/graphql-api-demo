@@ -7,6 +7,7 @@ APPNAME	= $(shell basename `pwd`)
 REGION	= $(shell aws configure get region)
 REGISTRY= $(ACCOUNT).dkr.ecr.$(REGION).amazonaws.com
 TABLE	= Rentals
+LISTEN  = 8080
 
 default: run
 
@@ -19,7 +20,7 @@ lint:
 generate: config.json pkg/schema/schema_graphql.go
 
 config.json: Makefile
-	echo '{"appname":"$(APPNAME)","region":"$(REGION)","registry":"$(REGISTRY)","table":"$(TABLE)"}' \
+	echo '{"appname":"$(APPNAME)","region":"$(REGION)","registry":"$(REGISTRY)","table":"$(TABLE)","listen":":$(LISTEN)"}' \
 	| jq . > $@
 
 pkg/schema/schema_graphql.go: api/schema.graphql
@@ -27,7 +28,7 @@ pkg/schema/schema_graphql.go: api/schema.graphql
 
 # Run the unit tests against the local DynamoDB
 test:	generate ddb-start
-	env CONFIG=`pwd`/config.json \
+	env CONFIG_DIR=`pwd` \
 	    AWS_DDB_ENDPOINT=http://localhost:8000 \
 	go test -test.v ./...
 
@@ -35,10 +36,13 @@ build:	test
 	go build
 
 run:	build
-	env CONFIG=`pwd`/config.json \
+	env CONFIG_DIR=`pwd` \
 	    AWS_SDK_LOAD_CONFIG=1 \
 	    AWS_DDB_ENDPOINT=http://localhost:8000 \
-	./$(APPNAME)
+	./$(APPNAME) serve
+
+clean:	ddb-stop
+	rm $(APPNAME)
 
 #===================================================================================================
 # Docker targets
@@ -70,7 +74,7 @@ docker-run: docker-build
 	docker run --rm \
 	--env     AWS_SDK_LOAD_CONFIG=1 \
 	--volume  ~/.aws:/root/.aws:ro  \
-	--publish 8080:8080 \
+	--publish $(LISTEN):$(LISTEN) \
 	$(IMAGE)
 
 docker-stop:
@@ -81,7 +85,7 @@ docker-stop:
 # Test the GraphQL API with curl
 
 API_IP	= 127.0.0.1
-API_URL	= http://$(API_IP):8080/query
+API_URL	= http://$(API_IP):$(LISTEN)/query
 
 test-api: get-customer get-movie get-store get-store-customers get-store-movies get-store-movies-year get-store-movies-title
 
@@ -162,12 +166,12 @@ ddb-stop:
 END=	$(shell if [ -n "$$AWS_DDB_ENDPOINT" ] ; then echo "--endpoint $$AWS_DDB_ENDPOINT" ; else echo "" ; fi )
 
 create-table: config.json data/moviedata.json.gz
-	go run cmd/table_create/main.go
+	go run main.go table-create -v
 	aws dynamodb wait table-exists --table-name $(TABLE) $(END) | cat
-	go run cmd/movies_load/main.go < data/moviedata.json.gz
-	go run cmd/stores_load/main.go
-	go run cmd/customers_load/main.go
-	go run cmd/movie_rent/main.go
+	go run main.go movies-load -v < data/moviedata.json.gz
+	go run main.go stores-load -v
+	go run main.go customers-load -v
+	go run main.go movie-rent -v
 
 delete-table:
 	aws dynamodb delete-table --table-name $(TABLE) $(END) \
